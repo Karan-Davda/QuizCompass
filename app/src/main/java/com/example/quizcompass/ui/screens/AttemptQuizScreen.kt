@@ -5,12 +5,13 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FieldValue
 import com.example.quizcompass.ui.navigation.Screen
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.util.*
 
@@ -32,12 +33,12 @@ fun AttemptQuizScreen(quizId: String, navController: NavController) {
             .collection("questions")
             .get()
             .await()
+
         questions = snapshot.documents.mapIndexed { index, doc ->
             val data = doc.data ?: emptyMap()
             data + mapOf("id" to doc.id, "index" to index)
         }
 
-        // Create initial attempt document
         val newAttempt = hashMapOf(
             "userId" to userId,
             "startedAt" to Date(startedAt),
@@ -81,7 +82,7 @@ fun AttemptQuizScreen(quizId: String, navController: NavController) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Button(onClick = {
-                    navController.navigate(Screen.ReviewQuiz.withId(quizId))
+                    navController.navigate(Screen.ReviewQuiz.withId(quizId, attemptDocId))
                 }) {
                     Text("Review Answers")
                 }
@@ -93,14 +94,15 @@ fun AttemptQuizScreen(quizId: String, navController: NavController) {
     val currentQuestion = questions[currentIndex]
     val questionText = currentQuestion["text"].toString()
     val options = currentQuestion["options"] as? List<*> ?: emptyList<Any>()
-    val correctAnswers = currentQuestion["correctAnswers"] as? List<Int> ?: emptyList()
+    val correctAnswers = (currentQuestion["correctAnswers"] as? List<*>)?.mapNotNull { (it as? Long)?.toInt() } ?: emptyList()
     val marks = (currentQuestion["marks"] as? Long)?.toInt() ?: 1
     val questionId = currentQuestion["id"]?.toString() ?: currentIndex.toString()
 
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .padding(16.dp)) {
-
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         Text("Question ${currentIndex + 1} of ${questions.size}", style = MaterialTheme.typography.subtitle2)
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -108,19 +110,21 @@ fun AttemptQuizScreen(quizId: String, navController: NavController) {
         Spacer(modifier = Modifier.height(16.dp))
 
         options.forEachIndexed { index, opt ->
-            val isSelected = selectedAnswers[currentIndex] == index
+            val selected = selectedAnswers[currentIndex] == index
+            val isCorrect = correctAnswers.contains(index)
+
             OutlinedButton(
                 onClick = {
                     selectedAnswers[currentIndex] = index
-                    val isCorrect = correctAnswers.contains(index)
                     val earnedMarks = if (isCorrect) marks else 0
+                    score += earnedMarks
 
-                    // Update Firestore attempt with answer and score
                     val newAnswer = mapOf(
                         "questionId" to questionId,
                         "selected" to listOf(index),
                         "textAnswer" to null,
-                        "earnedMarks" to earnedMarks
+                        "earnedMarks" to earnedMarks,
+                        "correct" to correctAnswers  // ✅ store correct indexes properly
                     )
 
                     db.collection("quizzes")
@@ -135,20 +139,25 @@ fun AttemptQuizScreen(quizId: String, navController: NavController) {
                     if (currentIndex < questions.lastIndex) {
                         currentIndex++
                     } else {
-                        showResult = true
-
                         db.collection("quizzes")
                             .document(quizId)
                             .collection("attempts")
                             .document(attemptDocId)
                             .update("completedAt", Date())
+                            .addOnSuccessListener {
+                                showResult = true
+                            }
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    backgroundColor = if (isSelected) MaterialTheme.colors.primary.copy(alpha = 0.2f) else MaterialTheme.colors.surface
+                    backgroundColor = when {
+                        selected && isCorrect -> Color(0xFFA5D6A7)
+                        selected && !isCorrect -> Color(0xFFEF9A9A)
+                        else -> MaterialTheme.colors.surface
+                    }
                 )
             ) {
                 Text(opt.toString())

@@ -25,6 +25,7 @@ import com.example.quizcompass.ui.screens.ReviewQuizScreen
 import com.example.quizcompass.ui.theme.QuizCompassTheme
 import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.runtime.LaunchedEffect
+import com.example.quizcompass.ui.screens.EditQuestionScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -103,10 +104,11 @@ fun QuizCompassApp() {
             composable(
                 route = Screen.ConfigureQuiz.route,
                 arguments = listOf(navArgument("quizId") { type = NavType.StringType })
-            ) {
-                val quizId = it.arguments?.getString("quizId") ?: ""
+            ) { backStackEntry ->
+                val quizId = backStackEntry.arguments?.getString("quizId") ?: ""
                 ConfigureQuizScreen(navController, quizId)
             }
+
             composable(
                 route = Screen.AttemptQuiz.route,
                 arguments = listOf(navArgument("quizId") { type = NavType.StringType })
@@ -116,11 +118,27 @@ fun QuizCompassApp() {
             }
             composable(
                 route = Screen.ReviewQuiz.route,
-                arguments = listOf(navArgument("quizId") { type = NavType.StringType })
-            ) {
-                val quizId = it.arguments?.getString("quizId") ?: ""
-                ReviewQuizScreen(quizId = quizId, navController = navController)
+                arguments = listOf(
+                    navArgument("quizId") { type = NavType.StringType },
+                    navArgument("attemptId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val quizId = backStackEntry.arguments?.getString("quizId") ?: ""
+                val attemptId = backStackEntry.arguments?.getString("attemptId") ?: ""
+                ReviewQuizScreen(quizId, attemptId, navController)
             }
+            composable(
+                route = Screen.EditQuestion.route,
+                arguments = listOf(
+                    navArgument("quizId") { type = NavType.StringType },
+                    navArgument("questionId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val quizId = backStackEntry.arguments?.getString("quizId") ?: ""
+                val questionId = backStackEntry.arguments?.getString("questionId") ?: ""
+                EditQuestionScreen(navController, quizId, questionId)
+            }
+
 
         }
     }

@@ -1,3 +1,5 @@
+// Updated ReviewQuizScreen.kt
+
 package com.example.quizcompass.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -8,14 +10,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
 @Composable
-fun ReviewQuizScreen(quizId: String, navController: NavController) {
+fun ReviewQuizScreen(quizId: String, attemptId: String, navController: NavController) {
     var questions by remember { mutableStateOf<List<Map<String, Any>>>(emptyList()) }
-    var selectedAnswers by remember { mutableStateOf<Map<String, List<Int>>>(emptyMap()) }
+    var answers by remember { mutableStateOf<List<Map<String, Any>>>(emptyList()) }
     var score by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
 
@@ -33,28 +34,14 @@ fun ReviewQuizScreen(quizId: String, navController: NavController) {
         val attemptSnapshot = db.collection("quizzes")
             .document(quizId)
             .collection("attempts")
-            .orderBy("completedAt")
+            .document(attemptId)
             .get()
             .await()
 
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-        val userAttempt = attemptSnapshot.documents.firstOrNull { it.getString("userId") == currentUserId }
+        val fetchedAnswers = attemptSnapshot.get("answers") as? List<Map<String, Any>> ?: emptyList()
+        answers = fetchedAnswers
 
-        val attemptData = userAttempt?.get("answers") as? List<Map<String, Any>>
-        selectedAnswers = attemptData?.associate {
-            val questionId = it["questionId"] as? String ?: ""
-            val selected = it["selected"] as? List<*> ?: emptyList<Any>()
-            questionId to selected.mapNotNull { sel -> sel as? Int }
-        } ?: emptyMap()
-
-        // Calculate score
-        score = questions.sumOf { q ->
-            val qId = q["id"] as? String ?: return@sumOf 0
-            val selected = selectedAnswers[qId].orEmpty()
-            val correct = (q["correctAnswers"] as? List<*>)?.mapNotNull { it as? Int } ?: emptyList()
-            val marks = (q["marks"] as? Long)?.toInt() ?: 0
-            if (selected.sorted() == correct.sorted()) marks else 0
-        }
+        score = (attemptSnapshot.getLong("score") ?: 0L).toInt()
 
         isLoading = false
     }
@@ -65,17 +52,26 @@ fun ReviewQuizScreen(quizId: String, navController: NavController) {
                 CircularProgressIndicator()
             }
         } else {
-            Column(modifier = Modifier.padding(padding).padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(padding)
+                    .padding(16.dp)
+            ) {
                 Text("Score: $score", style = MaterialTheme.typography.h6, modifier = Modifier.padding(bottom = 16.dp))
 
                 questions.forEachIndexed { index, question ->
                     val questionText = question["text"].toString()
                     val options = question["options"] as? List<*> ?: emptyList<Any>()
-                    val correctAnswers = question["correctAnswers"] as? List<*> ?: emptyList<Int>()
-                    val selected = selectedAnswers[question["id"] as String].orEmpty()
+                    val correctIndexes = (question["correctAnswers"] as? List<*>)?.mapNotNull { (it as? Long)?.toInt() } ?: emptyList()
+                    val questionId = question["id"] as? String ?: ""
+                    val selectedAnswer = answers.find { it["questionId"] == questionId }
+                    val selectedIndexes = selectedAnswer?.get("selected") as? List<Int> ?: emptyList()
+                    val earnedMarks = (selectedAnswer?.get("earnedMarks") as? Long)?.toInt() ?: 0
 
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
                         elevation = 4.dp
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
@@ -83,13 +79,13 @@ fun ReviewQuizScreen(quizId: String, navController: NavController) {
                             Spacer(modifier = Modifier.height(8.dp))
 
                             options.forEachIndexed { optIndex, opt ->
-                                val isCorrect = optIndex in correctAnswers.mapNotNull { it as? Int }
-                                val isSelected = optIndex in selected
+                                val isCorrectOption = correctIndexes.contains(optIndex)
+                                val isSelectedOption = selectedIndexes.contains(optIndex)
 
                                 val color = when {
-                                    isCorrect && isSelected -> Color.Green
-                                    isCorrect -> Color.Blue
-                                    isSelected -> Color.Red
+                                    isSelectedOption && isCorrectOption -> Color(0xFF388E3C) // ✅ Green
+                                    isSelectedOption && !isCorrectOption -> Color(0xFFD32F2F) // ❌ Red
+                                    !isSelectedOption && isCorrectOption -> Color(0xFF1976D2) // 🔵 Blue
                                     else -> MaterialTheme.colors.onSurface
                                 }
 
@@ -100,6 +96,13 @@ fun ReviewQuizScreen(quizId: String, navController: NavController) {
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                             }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Earned Marks: $earnedMarks",
+                                style = MaterialTheme.typography.caption,
+                                color = MaterialTheme.colors.primary
+                            )
                         }
                     }
                 }

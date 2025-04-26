@@ -5,14 +5,17 @@ sealed class Screen(val route: String) {
     object SignUp : Screen("signup")
     object Home : Screen("home")
     object Profile : Screen("profile")
-    object CreateQuiz : Screen("create_quiz")
-    object AttemptQuiz : Screen("attempt_quiz/{quizId}") {
-        fun withId(quizId: String) = "attempt_quiz/$quizId"
+    object CreateQuiz : Screen("createQuiz")
+    object ConfigureQuiz : Screen("configureQuiz/{quizId}") {
+        fun withId(quizId: String) = "configureQuiz/$quizId"
     }
-    object ConfigureQuiz : Screen("configure_quiz/{quizId}") {
-        fun withId(id: String) = "configure_quiz/$id"
+    object AttemptQuiz : Screen("attemptQuiz/{quizId}") {
+        fun withId(quizId: String) = "attemptQuiz/$quizId"
     }
-    object ReviewQuiz : Screen("review_quiz/{quizId}") {
-        fun withId(quizId: String) = "review_quiz/$quizId"
+    object ReviewQuiz : Screen("reviewQuiz/{quizId}/{attemptId}") {
+        fun withId(quizId: String, attemptId: String) = "reviewQuiz/$quizId/$attemptId"
+    }
+    object EditQuestion : Screen("editQuestion/{quizId}/{questionId}") {
+        fun withId(quizId: String, questionId: String) = "editQuestion/$quizId/$questionId"
     }
 }
