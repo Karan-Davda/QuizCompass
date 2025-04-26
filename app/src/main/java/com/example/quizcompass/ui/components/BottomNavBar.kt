@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.History
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.quizcompass.ui.navigation.Screen
@@ -16,6 +17,7 @@ data class BottomNavItem(val title: String, val route: String, val icon: ImageVe
 fun BottomNavBar(navController: NavController) {
     val items = listOf(
         BottomNavItem("Home", Screen.Home.route, Icons.Filled.Home),
+        BottomNavItem("attempts", Screen.AttemptRecords.route, Icons.Default.History) ,
         BottomNavItem("Profile", Screen.Profile.route, Icons.Filled.Person)
     )
 

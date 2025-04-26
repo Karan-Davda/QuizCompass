@@ -22,9 +22,9 @@ import com.example.quizcompass.ui.screens.ProfileScreen
 import com.example.quizcompass.ui.screens.auth.LoginScreen
 import com.example.quizcompass.ui.screens.auth.SignupScreen
 import com.example.quizcompass.ui.screens.ReviewQuizScreen
-import com.example.quizcompass.ui.theme.QuizCompassTheme
 import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.runtime.LaunchedEffect
+import com.example.quizcompass.ui.screens.AttemptsRecordsScreen
 import com.example.quizcompass.ui.screens.EditQuestionScreen
 
 class MainActivity : ComponentActivity() {
@@ -64,7 +64,7 @@ fun QuizCompassApp() {
     LaunchedEffect(navController) {
         navController.addOnDestinationChangedListener { _, destination, _ ->
             showBottomBar.value =
-                destination.route == Screen.Home.route || destination.route == Screen.Profile.route
+                destination.route == Screen.Home.route || destination.route == Screen.Profile.route || destination.route == Screen.AttemptRecords.route
         }
     }
 
@@ -98,8 +98,16 @@ fun QuizCompassApp() {
                     ProfileScreen(navController)
                 }
             }
-            composable(Screen.CreateQuiz.route) {
-                CreateQuizScreen(navController)
+            composable(
+                route = Screen.CreateQuiz.route + "?quizId={quizId}&edit={edit}",
+                arguments = listOf(
+                    navArgument("quizId") { nullable = true },
+                    navArgument("edit") { defaultValue = "false" }
+                )
+            ) { backStackEntry ->
+                val quizId = backStackEntry.arguments?.getString("quizId")
+                val isEditMode = backStackEntry.arguments?.getString("edit") == "true"
+                CreateQuizScreen(navController, quizId, isEditMode)
             }
             composable(
                 route = Screen.ConfigureQuiz.route,
@@ -120,12 +128,14 @@ fun QuizCompassApp() {
                 route = Screen.ReviewQuiz.route,
                 arguments = listOf(
                     navArgument("quizId") { type = NavType.StringType },
-                    navArgument("attemptId") { type = NavType.StringType }
+                    navArgument("attemptId") { type = NavType.StringType },
+                    navArgument("source") { type = NavType.StringType }
                 )
             ) { backStackEntry ->
                 val quizId = backStackEntry.arguments?.getString("quizId") ?: ""
                 val attemptId = backStackEntry.arguments?.getString("attemptId") ?: ""
-                ReviewQuizScreen(quizId, attemptId, navController)
+                val source = backStackEntry.arguments?.getString("source")
+                ReviewQuizScreen(quizId, attemptId, source, navController)
             }
             composable(
                 route = Screen.EditQuestion.route,
@@ -137,6 +147,10 @@ fun QuizCompassApp() {
                 val quizId = backStackEntry.arguments?.getString("quizId") ?: ""
                 val questionId = backStackEntry.arguments?.getString("questionId") ?: ""
                 EditQuestionScreen(navController, quizId, questionId)
+            }
+
+            composable("attemptsRecord") {
+                AttemptsRecordsScreen(navController)
             }
 
 

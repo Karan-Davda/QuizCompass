@@ -157,7 +157,8 @@ fun ProfileScreen(navController: NavController) {
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 IconButton(onClick = {
-                                    navController.navigate(Screen.ConfigureQuiz.withId(quizId))
+                                    navController.navigate(Screen.CreateQuiz.withIdAndEdit(quizId, true))
+
                                 }) {
                                     Icon(Icons.Default.Edit, contentDescription = "Edit Quiz")
                                 }

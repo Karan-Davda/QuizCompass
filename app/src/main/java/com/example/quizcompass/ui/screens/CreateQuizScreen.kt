@@ -1,8 +1,10 @@
 package com.example.quizcompass.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -10,12 +12,18 @@ import androidx.navigation.NavController
 import com.example.quizcompass.ui.navigation.Screen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 import java.util.*
-import androidx.compose.ui.Alignment
-import androidx.compose.foundation.text.KeyboardOptions
 
 @Composable
-fun CreateQuizScreen(navController: NavController) {
+fun CreateQuizScreen(
+    navController: NavController,
+    quizId: String? = null,
+    isEditMode: Boolean = false
+) {
+    val db = FirebaseFirestore.getInstance()
+    val user = FirebaseAuth.getInstance().currentUser
+
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var totalMarks by remember { mutableStateOf("") }
@@ -23,9 +31,20 @@ fun CreateQuizScreen(navController: NavController) {
     var loading by remember { mutableStateOf(false) }
     val visibilities = listOf("public", "invite-only", "private")
 
+    // Load existing quiz details if edit mode
+    LaunchedEffect(key1 = isEditMode, key2 = quizId) {
+        if (isEditMode && quizId != null) {
+            val snapshot = db.collection("quizzes").document(quizId).get().await()
+            title = snapshot.getString("title") ?: ""
+            description = snapshot.getString("description") ?: ""
+            totalMarks = snapshot.getLong("totalMarks")?.toString() ?: ""
+            visibility = snapshot.getString("visibility") ?: "public"
+        }
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Create Quiz") })
+            TopAppBar(title = { Text(if (isEditMode) "Edit Quiz" else "Create Quiz") })
         }
     ) { padding ->
         Column(
@@ -53,8 +72,8 @@ fun CreateQuizScreen(navController: NavController) {
 
             OutlinedTextField(
                 value = totalMarks,
-                onValueChange = {
-                    if (it.all { char -> char.isDigit() }) totalMarks = it
+                onValueChange = { newValue ->
+                    if (newValue.all { it.isDigit() }) totalMarks = newValue
                 },
                 label = { Text("Total Marks") },
                 keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
@@ -75,7 +94,7 @@ fun CreateQuizScreen(navController: NavController) {
                         selected = visibility == option,
                         onClick = { visibility = option }
                     )
-                    Text(text = option.replaceFirstChar { it.uppercase() })
+                    Text(option.replaceFirstChar { it.uppercase() })
                 }
             }
 
@@ -84,33 +103,49 @@ fun CreateQuizScreen(navController: NavController) {
             Button(
                 onClick = {
                     loading = true
-                    val db = FirebaseFirestore.getInstance()
-                    val quizId = UUID.randomUUID().toString()
-                    val quizData = hashMapOf(
+                    val data = hashMapOf(
                         "title" to title,
                         "description" to description,
                         "visibility" to visibility,
-                        "creatorId" to FirebaseAuth.getInstance().currentUser?.uid,
-                        "createdAt" to System.currentTimeMillis(),
                         "totalMarks" to totalMarks.toIntOrNull()
                     )
 
-                    db.collection("quizzes")
-                        .document(quizId)
-                        .set(quizData)
-                        .addOnSuccessListener {
-                            loading = false
-                            navController.navigate(Screen.ConfigureQuiz.withId(quizId))
-                        }
-                        .addOnFailureListener {
-                            loading = false
-                            // optionally show error
-                        }
+                    if (isEditMode && quizId != null) {
+                        // Update existing quiz
+                        db.collection("quizzes")
+                            .document(quizId)
+                            .update(data as Map<String, Any>)
+                            .addOnSuccessListener {
+                                loading = false
+                                navController.navigate(Screen.ConfigureQuiz.withId(quizId))
+                            }
+                            .addOnFailureListener {
+                                loading = false
+                            }
+                    } else {
+                        // Create new quiz
+                        val newQuizId = UUID.randomUUID().toString()
+                        val fullData = data + mapOf(
+                            "creatorId" to user?.uid,
+                            "createdAt" to System.currentTimeMillis()
+                        )
+
+                        db.collection("quizzes")
+                            .document(newQuizId)
+                            .set(fullData)
+                            .addOnSuccessListener {
+                                loading = false
+                                navController.navigate(Screen.ConfigureQuiz.withId(newQuizId))
+                            }
+                            .addOnFailureListener {
+                                loading = false
+                            }
+                    }
                 },
                 enabled = title.isNotBlank() && totalMarks.isNotBlank() && !loading,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (loading) "Saving..." else "Next: Add Questions")
+                Text(if (loading) "Saving..." else if (isEditMode) "Update Quiz" else "Next: Add Questions")
             }
         }
     }

@@ -82,7 +82,7 @@ fun AttemptQuizScreen(quizId: String, navController: NavController) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Button(onClick = {
-                    navController.navigate(Screen.ReviewQuiz.withId(quizId, attemptDocId))
+                    navController.navigate(Screen.ReviewQuiz.withId(quizId, attemptDocId, "home"))
                 }) {
                     Text("Review Answers")
                 }
